@@ -1,0 +1,48 @@
+[
+  {
+    "user_id": "1df6fbc4",
+    "timestamp": "2025-04-17T20:11:15.389929",
+    "task_id": "vYHeQzSholTZqkNY",
+    "question": "are there any other blue objects that have the same shape as the large metal thing?",
+    "label": "b",
+    "confidence": 0.9999999000000099
+  },
+  {
+    "user_id": "1df6fbc4",
+    "task_id": "MEkGw38YR07sACAi",
+    "topic": "fashion",
+    "label": "a",
+    "confidence": 0.9999999000000099
+  },
+  {
+    "user_id": "1df6fbc4",
+    "task_id": "sn9GKetSJtmE3ij4",
+    "question": "is there a blue shoe that has the same material as the bag?",
+    "topic": "fashion",
+    "label": "b",
+    "confidence": 0.9999999000000099,
+    "timestamp": "2025-04-17T19:25:00.723668"
+  },
+  {
+    "user_id": "1df6fbc4",
+    "timestamp": "2025-04-17T19:32:48.253311",
+    "question": "is there anything else that has the same shape as the small brown object?",
+    "label": "b",
+    "confidence": 0.9999999000000099
+  },
+  {
+    "user_id": "1df6fbc4",
+    "timestamp": "2025-04-17T19:37:35.622779",
+    "question": "is there a tiny red object made of the same material as the large gray bag?",
+    "label": "a",
+    "confidence": 0.9999999000000099
+  },
+  {
+    "user_id": "1df6fbc4",
+    "task_id": "task456",
+    "question": "Do cats bark?",
+    "label": "b",
+    "confidence": 0.99,
+    "timestamp": "2025-04-19T22:38:31.114019"
+  }
+]
