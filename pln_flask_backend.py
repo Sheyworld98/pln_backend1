@@ -20,7 +20,20 @@ def read_json(filename, default=None):
 
 @app.route("/profile/<user_id>")
 def get_profile(user_id):
-    return read_json(f"{user_id}_profile.json", default={"languages": [], "expertise_domains": [], "complexity_level": "N/A"})
+    filename = f"{user_id}_profile.json"
+    try:
+        with open(filename, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return jsonify(data)
+    except FileNotFoundError:
+        return jsonify({
+            "languages": [],
+            "expertise_domains": [],
+            "complexity_level": "N/A"
+        }), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 
 @app.route("/score/<user_id>")
 def get_score(user_id):
