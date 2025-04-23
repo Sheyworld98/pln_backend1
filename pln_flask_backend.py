@@ -13,7 +13,7 @@ def load_json(filename):
     path = os.path.join(DATA_DIR, filename)
     if not os.path.exists(path):
         return {}
-    with open(path, 'r', encoding='utf-8') as f:
+    with open(filename, "r", encoding="utf-8-sig") as f:
         return json.load(f)
 
 def save_json(filename, data):
