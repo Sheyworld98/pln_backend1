@@ -57,6 +57,7 @@ def history(user_id):
 def fetch_task(user_id):
     lang = request.args.get("lang", "en")
     topic = request.args.get("topic", "").strip()
+    params["topic"] = topic.lower()
 
     completed = load_json("completed_tasks.json")
     user_done = set(completed.get(user_id, []))
