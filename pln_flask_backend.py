@@ -56,13 +56,26 @@ def history(user_id):
 @app.route("/task/fetch/<user_id>")
 def fetch_task(user_id):
     lang = request.args.get("lang", "en")
-    topic = request.args.get("topic", None)
+    topic = request.args.get("topic", "").strip()
 
     completed = load_json("completed_tasks.json")
     user_done = set(completed.get(user_id, []))
 
-    params = {"lang": lang}
-    if topic: params["topic"] = topic
+    profile = load_profile(user_id)
+    expertise_domains = profile.get("expertise_domains", [])
+    complexity = profile.get("complexity_level", 1)
+
+    if not topic and expertise_domains:
+        topic = expertise_domains[0]  # fallback to user's expertise
+
+    params = {
+        "lang": lang,
+        "category": "vqa",
+        "type": "true-false",
+        "complexity": complexity
+    }
+    if topic:
+        params["topic"] = topic
 
     headers = {"X-API-Key": "OkYLZD1-ZF0e9WV1wI5Naela5HhyVC6d"}
 
