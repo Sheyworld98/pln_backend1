@@ -59,7 +59,8 @@ def history(user_id):
 @app.route("/task/fetch/<user_id>")
 def fetch_task(user_id):
     lang = request.args.get("lang", "en")
-    topic = request.args.get("topic", None)
+    topic = request.args.get("topic")
+    complexity = request.args.get("complexity")
 
     profile = load_json("user_profile.json").get(user_id, {})
     completed = load_json("completed_tasks.json")
@@ -70,6 +71,14 @@ def fetch_task(user_id):
         params["topic"] = topic.lower()
     elif profile.get("expertise_domains"):
         params["topic"] = profile["expertise_domains"][0].lower()
+
+    if complexity:
+        try:
+            params["complexity"] = int(complexity)
+        except ValueError:
+            pass
+    elif profile.get("complexity_level"):
+        params["complexity"] = profile["complexity_level"]
 
     headers = {"X-API-Key": API_KEY}
 
@@ -86,6 +95,7 @@ def fetch_task(user_id):
         return jsonify({"error": "No new task available"})
 
     return jsonify(task)
+
 
 
 @app.route("/task/submit/<task_id>", methods=["POST"])
