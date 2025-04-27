@@ -85,39 +85,49 @@ def fetch_task(user_id):
 @app.route("/task/submit/<task_id>", methods=["POST"])
 def submit_task(task_id):
     data = request.get_json()
-    user_id = data.get("user_id")
-    solution = data.get("solution")
-    question = data.get("question")
-    track_id = data.get("track_id")
+    user_id = data["user_id"]
+    solution = data["solution"]
+    question = data["question"]
+    track_id = data["track_id"]
 
-    if not user_id or not solution or not track_id:
-        return jsonify({"error": "Missing fields"}), 400
+    payload = {
+        "track_id": track_id,
+        "solution": solution
+    }
 
-    headers = {"X-API-Key": API_KEY}
-    payload = {"track_id": track_id, "solution": solution}
+    headers = {"X-API-Key": "OkYLZD1-ZF0e9WV1wI5Naela5HhyVC6d"}
 
     try:
-        res = requests.post(f"{API_URL}/tasks/{task_id}/submit", data=payload, headers=headers, verify=False)
+        res = requests.post(f"https://crowdlabel.tii.ae/api/2025.2/tasks/{task_id}/submit", data=payload, headers=headers, verify=False)
         if res.status_code != 200:
             return jsonify({"error": "Submission failed"}), 500
-        result = res.json()
+
+        submission = res.json()
+
+        # ✅ Mark the task as completed ONLY after submission!
+        completed = load_json("completed_tasks.json")
+        if user_id not in completed:
+            completed[user_id] = []
+        completed[user_id].append(task_id)
+        save_json(completed, "completed_tasks.json")
+
+        # ✅ Save labeling history
+        history = load_json("history.json")
+        if user_id not in history:
+            history[user_id] = []
+        history[user_id].append({
+            "timestamp": datetime.datetime.utcnow().isoformat(),
+            "question": question,
+            "label": solution,
+            "confidence": submission.get("confidence", 1.0)
+        })
+        save_json(history, "history.json")
+
+        return jsonify(submission)
+
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-    # Save completed task
-    completed_tasks.setdefault(user_id, []).append(task_id)
-    save_json("completed_tasks.json", completed_tasks)
-
-    # Save labeling history
-    labeling_history.setdefault(user_id, []).append({
-        "timestamp": str(requests.get("https://worldtimeapi.org/api/timezone/Etc/UTC").json()["utc_datetime"]),
-        "question": question,
-        "label": solution,
-        "confidence": result.get("confidence", 1.0)
-    })
-    save_json("labeling_history.json", labeling_history)
-
-    return jsonify(result)
 
 @app.route("/update_profile/<user_id>", methods=["POST"])
 def update_profile(user_id):
