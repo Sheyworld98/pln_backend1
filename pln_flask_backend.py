@@ -54,7 +54,8 @@ def fetch_task(user_id):
     topic = request.args.get("topic", None)
     complexity = request.args.get("complexity", None)
 
-    user_done = set(completed_tasks.get(user_id, []))
+    completed = load_json("completed_tasks.json")
+    user_done = set(completed.get(user_id, []))
 
     params = {"lang": lang}
     if topic:
@@ -62,21 +63,24 @@ def fetch_task(user_id):
     if complexity:
         params["complexity"] = complexity
 
-    headers = {"X-API-Key": API_KEY}
+    headers = {"X-API-Key": "OkYLZD1-ZF0e9WV1wI5Naela5HhyVC6d"}
 
     try:
-        res = requests.get(f"{API_URL}/tasks/pick", params=params, headers=headers, verify=False)
+        res = requests.get("https://crowdlabel.tii.ae/api/2025.2/tasks/pick", params=params, headers=headers, verify=False)
         if res.status_code != 200:
             return jsonify({"error": "Failed to fetch task"}), 500
+
         task_list = res.json()
+
+        # Find a task not completed yet
+        task = next((t for t in task_list if t['id'] not in user_done), None)
+        if not task:
+            return jsonify({"error": "No new task available"}), 200  # Important: Still return 200, not 500
+
+        return jsonify(task)
+
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-
-    task = next((t for t in task_list if t['id'] not in user_done), None)
-    if not task:
-        return jsonify({"error": "No new task available"})
-
-    return jsonify(task)
 
 @app.route("/task/submit/<task_id>", methods=["POST"])
 def submit_task(task_id):
