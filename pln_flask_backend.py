@@ -108,6 +108,15 @@ def submit_task(task_id):
     question = data["question"]
     track_id = data["track_id"]
 
+     submission = {
+        "id": task_id,
+        "track_id": track_id,
+        "question": question,
+        "label": solution,
+        "confidence": 1.0,
+        "timestamp": datetime.utcnow().isoformat()  # <-- Save UTC timestamp here
+    }
+
     headers = {"X-API-Key": "OkYLZD1-ZF0e9WV1wI5Naela5HhyVC6d"}
 
     res = requests.post(f"https://crowdlabel.tii.ae/api/2025.2/tasks/{task_id}/submit", data={"track_id": track_id, "solution": solution}, headers=headers, verify=False)
