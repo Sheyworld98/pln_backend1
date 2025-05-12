@@ -85,7 +85,7 @@ def fetch_task(user_id):
 
     return jsonify(task)
 
-@app.route("/task/submit/<task_id>", methods=["POST"])
+@app.route("/tasks/<task_id>/submit", methods=["POST"])
 def submit_answer(task_id):
     data = request.get_json()
     user_id = data["user_id"]
