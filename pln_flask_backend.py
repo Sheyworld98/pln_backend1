@@ -99,7 +99,7 @@ def submit_answer(task_id):
         "question": question,
         "label": solution,
         "confidence": 1.0,
-        "timestamp": datetime.utcnow().isoformat()  # <=== save real timestamp here
+        "timestamp": datetime.utcnow().isoformat()
     }
 
     completed = load_json("completed_tasks.json")
@@ -110,7 +110,24 @@ def submit_answer(task_id):
     history.setdefault(user_id, []).append(submission)
     save_json("user_history.json", history)
 
-    return jsonify({"message": "Answer recorded", "confidence": 1.0})
+    # 🏅 Gamification Logic
+    total_tasks = len(history[user_id])
+    badge = None
+    reward = None
+
+    if total_tasks == 3:
+        badge = "silver"
+    elif total_tasks == 6:
+        badge = "gold"
+    elif total_tasks >= 12:
+        reward = "https://chatbot.example.com/free-access"
+
+    return jsonify({
+        "message": "Answer recorded",
+        "confidence": 1.0,
+        "badge": badge,
+        "reward": reward
+    })
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
