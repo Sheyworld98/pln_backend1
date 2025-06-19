@@ -66,8 +66,10 @@ def fetch_task(user_id):
     user_done = set(completed.get(user_id, []))
 
     params = {"lang": lang}
-    if topic: params["topic"] = topic
-    if complexity: params["complexity"] = complexity
+    if topic:
+        params["topic"] = topic
+    if complexity:
+        params["complexity"] = complexity
 
     headers = {"X-API-Key": "OkYLZD1-ZF0e9WV1wI5Naela5HhyVC6d"}
 
@@ -96,10 +98,16 @@ def submit_answer(task_id):
         return jsonify({"message": "CORS preflight OK"}), 200
 
     data = request.get_json()
-    user_id = data["user_id"]
-    solution = data["solution"]
-    question = data["question"]
-    track_id = data["track_id"]
+    if not data:
+        return jsonify({"error": "Missing or invalid JSON data"}), 400
+
+    try:
+        user_id = data["user_id"]
+        solution = data["solution"]
+        question = data["question"]
+        track_id = data["track_id"]
+    except KeyError as e:
+        return jsonify({"error": f"Missing key: {str(e)}"}), 400
 
     submission = {
         "id": task_id,
@@ -110,7 +118,9 @@ def submit_answer(task_id):
         "timestamp": datetime.utcnow().isoformat()
     }
 
-    # Forward to CrowdLabel
+    print("Submission payload:", submission)
+
+    # Forward to external CrowdLabel API
     try:
         headers = {
             "Content-Type": "application/json",
@@ -123,11 +133,12 @@ def submit_answer(task_id):
             verify=False
         )
         if res.status_code != 200:
+            print("CrowdLabel submission failed:", res.status_code, res.text)
             return jsonify({"error": "Failed to submit to CrowdLabel"}), 500
     except Exception as e:
         return jsonify({"error": f"Submission exception: {str(e)}"}), 500
 
-    # Local history/save
+    # Save locally
     completed = load_json("completed_tasks.json")
     completed.setdefault(user_id, []).append(task_id)
     save_json("completed_tasks.json", completed)
@@ -136,9 +147,10 @@ def submit_answer(task_id):
     history.setdefault(user_id, []).append(submission)
     save_json("user_history.json", history)
 
+    # Reward logic
+    total_tasks = len(history[user_id])
     badge = None
     reward = None
-    total_tasks = len(history[user_id])
     if total_tasks == 3:
         badge = "silver"
     elif total_tasks == 6:
