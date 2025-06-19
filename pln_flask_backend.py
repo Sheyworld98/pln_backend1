@@ -6,7 +6,7 @@ from datetime import datetime
 import requests
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
 
 def load_json(path):
     if os.path.exists(path):
@@ -90,8 +90,11 @@ def fetch_task(user_id):
 
     return jsonify(task)
 
-@app.route("/task/<task_id>/submit", methods=["POST"])
+@app.route("/task/<task_id>/submit", methods=["POST", "OPTIONS"])
 def submit_answer(task_id):
+    if request.method == "OPTIONS":
+        return jsonify({"message": "CORS preflight OK"}), 200
+
     data = request.get_json()
     user_id = data["user_id"]
     solution = data["solution"]
@@ -107,7 +110,7 @@ def submit_answer(task_id):
         "timestamp": datetime.utcnow().isoformat()
     }
 
-    # Send to CrowdLabel endpoint
+    # Forward to CrowdLabel
     try:
         headers = {
             "Content-Type": "application/json",
@@ -124,7 +127,7 @@ def submit_answer(task_id):
     except Exception as e:
         return jsonify({"error": f"Submission exception: {str(e)}"}), 500
 
-    # Save locally
+    # Local history/save
     completed = load_json("completed_tasks.json")
     completed.setdefault(user_id, []).append(task_id)
     save_json("completed_tasks.json", completed)
@@ -133,11 +136,9 @@ def submit_answer(task_id):
     history.setdefault(user_id, []).append(submission)
     save_json("user_history.json", history)
 
-    # Gamification logic
-    total_tasks = len(history[user_id])
     badge = None
     reward = None
-
+    total_tasks = len(history[user_id])
     if total_tasks == 3:
         badge = "silver"
     elif total_tasks == 6:
