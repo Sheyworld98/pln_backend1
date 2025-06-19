@@ -97,17 +97,17 @@ def submit_answer(task_id):
     if request.method == "OPTIONS":
         return jsonify({"message": "CORS preflight OK"}), 200
 
-    data = request.get_json()
-    if not data:
-        return jsonify({"error": "Missing or invalid JSON data"}), 400
-
     try:
+        data = request.get_json()
+        print("Received data:", data)
+
         user_id = data["user_id"]
         solution = data["solution"]
         question = data["question"]
         track_id = data["track_id"]
-    except KeyError as e:
-        return jsonify({"error": f"Missing key: {str(e)}"}), 400
+    except Exception as e:
+        print("Error parsing submission:", str(e))
+        return jsonify({"error": "Malformed submission payload"}), 400
 
     submission = {
         "id": task_id,
