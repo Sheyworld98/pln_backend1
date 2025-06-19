@@ -72,7 +72,12 @@ def fetch_task(user_id):
     headers = {"X-API-Key": "OkYLZD1-ZF0e9WV1wI5Naela5HhyVC6d"}
 
     try:
-        res = requests.get("https://crowdlabel.tii.ae/api/2025.2/tasks/pick", params=params, headers=headers, verify=False)
+        res = requests.get(
+            "https://crowdlabel.tii.ae/api/2025.2/tasks/pick",
+            params=params,
+            headers=headers,
+            verify=False
+        )
         if res.status_code != 200:
             return jsonify({"error": "Failed to fetch task"}), 500
         task_list = res.json()
@@ -102,6 +107,24 @@ def submit_answer(task_id):
         "timestamp": datetime.utcnow().isoformat()
     }
 
+    # Send to CrowdLabel endpoint
+    try:
+        headers = {
+            "Content-Type": "application/json",
+            "X-API-Key": "OkYLZD1-ZF0e9WV1wI5Naela5HhyVC6d"
+        }
+        res = requests.post(
+            f"https://crowdlabel.tii.ae/api/2025.2/tasks/{task_id}/submit",
+            headers=headers,
+            json=submission,
+            verify=False
+        )
+        if res.status_code != 200:
+            return jsonify({"error": "Failed to submit to CrowdLabel"}), 500
+    except Exception as e:
+        return jsonify({"error": f"Submission exception: {str(e)}"}), 500
+
+    # Save locally
     completed = load_json("completed_tasks.json")
     completed.setdefault(user_id, []).append(task_id)
     save_json("completed_tasks.json", completed)
@@ -110,7 +133,7 @@ def submit_answer(task_id):
     history.setdefault(user_id, []).append(submission)
     save_json("user_history.json", history)
 
-    # 🏅 Gamification Logic
+    # Gamification logic
     total_tasks = len(history[user_id])
     badge = None
     reward = None
