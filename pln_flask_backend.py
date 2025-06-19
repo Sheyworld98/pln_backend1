@@ -8,25 +8,30 @@ import requests
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
 
+
 def load_json(path):
     if os.path.exists(path):
         with open(path, "r") as f:
             return json.load(f)
     return {}
 
+
 def save_json(path, data):
     with open(path, "w") as f:
         json.dump(data, f, indent=2)
+
 
 @app.route("/users")
 def users():
     users_data = load_json("user_profile.json")
     return jsonify(list(users_data.keys()))
 
+
 @app.route("/profile/<user_id>")
 def profile(user_id):
     profiles = load_json("user_profile.json")
     return jsonify(profiles.get(user_id, {}))
+
 
 @app.route("/profile/update/<user_id>", methods=["POST"])
 def update_profile(user_id):
@@ -39,10 +44,12 @@ def update_profile(user_id):
     save_json("user_profile.json", profiles)
     return jsonify({"message": "Profile updated."})
 
+
 @app.route("/score/<user_id>")
 def score(user_id):
     history = load_json("user_history.json")
     return jsonify({user_id: len(history.get(user_id, [])) * 20})
+
 
 @app.route("/leaderboard")
 def leaderboard():
@@ -51,16 +58,18 @@ def leaderboard():
     scores.sort(key=lambda x: x["score"], reverse=True)
     return jsonify(scores)
 
+
 @app.route("/history/<user_id>")
 def history(user_id):
     history = load_json("user_history.json")
     return jsonify(history.get(user_id, []))
 
+
 @app.route("/task/fetch/<user_id>")
 def fetch_task(user_id):
     lang = request.args.get("lang", "en")
-    topic = request.args.get("topic", None)
-    complexity = request.args.get("complexity", None)
+    topic = request.args.get("topic")
+    complexity = request.args.get("complexity")
 
     completed = load_json("completed_tasks.json")
     user_done = set(completed.get(user_id, []))
@@ -92,22 +101,23 @@ def fetch_task(user_id):
 
     return jsonify(task)
 
+
 @app.route("/task/<task_id>/submit", methods=["POST", "OPTIONS"])
 def submit_answer(task_id):
     if request.method == "OPTIONS":
         return jsonify({"message": "CORS preflight OK"}), 200
 
     try:
-        data = request.get_json()
-        print("Received data:", data)
+        data = request.get_json(force=True)
+        print("Received data:", json.dumps(data, indent=2))
 
         user_id = data["user_id"]
         solution = data["solution"]
         question = data["question"]
         track_id = data["track_id"]
     except Exception as e:
-        print("Error parsing submission:", str(e))
-        return jsonify({"error": "Malformed submission payload"}), 400
+        print("Error reading JSON body:", str(e))
+        return jsonify({"error": "Invalid JSON body"}), 400
 
     submission = {
         "id": task_id,
@@ -120,7 +130,6 @@ def submit_answer(task_id):
 
     print("Submission payload:", submission)
 
-    # Forward to external CrowdLabel API
     try:
         headers = {
             "Content-Type": "application/json",
@@ -138,7 +147,6 @@ def submit_answer(task_id):
     except Exception as e:
         return jsonify({"error": f"Submission exception: {str(e)}"}), 500
 
-    # Save locally
     completed = load_json("completed_tasks.json")
     completed.setdefault(user_id, []).append(task_id)
     save_json("completed_tasks.json", completed)
@@ -147,7 +155,6 @@ def submit_answer(task_id):
     history.setdefault(user_id, []).append(submission)
     save_json("user_history.json", history)
 
-    # Reward logic
     total_tasks = len(history[user_id])
     badge = None
     reward = None
@@ -164,6 +171,7 @@ def submit_answer(task_id):
         "badge": badge,
         "reward": reward
     })
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
