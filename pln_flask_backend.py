@@ -78,13 +78,12 @@ def history(user_id):
     history = load_json("user_history.json")
     return jsonify(history.get(user_id, []))
 
-
 @app.route("/task/fetch/<user_id>")
 def fetch_task(user_id):
-    import certifi  # make sure this is available
+    import certifi
     lang = request.args.get("lang", "en")
-    topic = request.args.get("topic", None)
-    complexity = request.args.get("complexity", None)
+    topic = request.args.get("topic")
+    complexity = request.args.get("complexity")
 
     if lang not in SUPPORTED_LANGUAGES:
         return jsonify({"error": f"Unsupported language: {lang}"}), 400
@@ -96,45 +95,46 @@ def fetch_task(user_id):
     completed = load_json("completed_tasks.json")
     user_done = set(completed.get(user_id, []))
 
-    params = {
-        "lang": lang,
-        "topic": topic,
-        "complexity": complexity
-    }
+    params = {"lang": lang}
+    if topic: params["topic"] = topic
+    if complexity: params["complexity"] = complexity
 
-    headers = {
-        "X-API-Key": "OkYLZD1-ZF0e9WV1wI5Naela5HhyVC6d"
-    }
+    headers = {"X-API-Key": "OkYLZD1-ZF0e9WV1wI5Naela5HhyVC6d"}
 
     try:
+        print(f"\n📡 Fetching from CrowdLabel: {params}")
         res = requests.get(
             "https://crowdlabel.tii.ae/api/2025.2/tasks/pick",
             params=params,
             headers=headers,
-            verify=certifi.where()  # <-- THIS LINE IS KEY
+            timeout=15,
+            verify=certifi.where()
         )
 
-        print("CrowdLabel fetch response:", res.status_code, res.text)
+        print(f"🌐 CrowdLabel status: {res.status_code}")
+        print("📝 Response text:", res.text)
 
         if res.status_code != 200:
             return jsonify({"error": "Failed to fetch task", "details": res.text}), 500
 
         task_list = res.json()
-
         if not isinstance(task_list, list) or not task_list:
-            return jsonify({"error": "No tasks available from CrowdLabel"}), 500
+            return jsonify({"error": "No tasks available or API issue"}), 500
 
-        task = next((t for t in task_list if t["id"] not in user_done), None)
-
+        task = next((t for t in task_list if t['id'] not in user_done), None)
         if not task:
-            return jsonify({"error": "No new task available for user"}), 404
+            return jsonify({"error": "No new task available"})
 
         return jsonify(task)
 
     except requests.exceptions.SSLError as ssl_err:
-        return jsonify({"error": "SSL verification failed", "details": str(ssl_err)}), 500
+        print("❌ SSL ERROR:", ssl_err)
+        return jsonify({"error": "SSL Certificate Error", "details": str(ssl_err)}), 500
+
     except Exception as e:
-        return jsonify({"error": "Exception occurred while fetching task", "details": str(e)}), 500
+        print("❌ General Error:", str(e))
+        return jsonify({"error": "General Exception", "details": str(e)}), 500
+
 
 
 
