@@ -126,8 +126,6 @@ def fetch_task(user_id):
 
         return jsonify(task)
 
-    except Exception as e:
-        return jsonify({"error": "Exception occurred while fetching task", "details": str(e)}), 500
 
 
 @app.route("/tasks/<task_id>/submit", methods=["POST", "OPTIONS"])
@@ -185,10 +183,8 @@ def submit_answer(task_id):
 
    
 
-    return jsonify({
-        "message": "Answer submitted successfully!",
-        "confidence": 1.0
-    }), 200
+    return jsonify({"message": "Answer recorded", "confidence": 1.0})
+
 
 
 if __name__ == "__main__":
