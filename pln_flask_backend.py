@@ -115,21 +115,23 @@ def submit_answer(task_id):
         solution = data["solution"]
         question = data["question"]
         track_id = data["track_id"]
+
+        submission = {
+            "id": task_id,
+            "track_id": track_id,
+            "question": question,
+            "label": solution,
+            "confidence": 1.0,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+
+        print("Submission payload:", submission)
+
     except Exception as e:
         print("Error reading JSON body:", str(e))
         return jsonify({"error": "Invalid JSON body"}), 400
 
-    submission = {
-        "id": task_id,
-        "track_id": track_id,
-        "question": question,
-        "label": solution,
-        "confidence": 1.0,
-        "timestamp": datetime.utcnow().isoformat()
-    }
-
-    print("Submission payload:", submission)
-
+    # Forward to CrowdLabel
     try:
         headers = {
             "Content-Type": "application/json",
@@ -147,6 +149,7 @@ def submit_answer(task_id):
     except Exception as e:
         return jsonify({"error": f"Submission exception: {str(e)}"}), 500
 
+    # Save locally
     completed = load_json("completed_tasks.json")
     completed.setdefault(user_id, []).append(task_id)
     save_json("completed_tasks.json", completed)
@@ -155,6 +158,7 @@ def submit_answer(task_id):
     history.setdefault(user_id, []).append(submission)
     save_json("user_history.json", history)
 
+    # Reward system
     total_tasks = len(history[user_id])
     badge = None
     reward = None
@@ -171,6 +175,7 @@ def submit_answer(task_id):
         "badge": badge,
         "reward": reward
     })
+
 
 
 if __name__ == "__main__":
