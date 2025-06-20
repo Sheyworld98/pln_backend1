@@ -8,30 +8,25 @@ import requests
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
 
-
 def load_json(path):
     if os.path.exists(path):
         with open(path, "r") as f:
             return json.load(f)
     return {}
 
-
 def save_json(path, data):
     with open(path, "w") as f:
         json.dump(data, f, indent=2)
-
 
 @app.route("/users")
 def users():
     users_data = load_json("user_profile.json")
     return jsonify(list(users_data.keys()))
 
-
 @app.route("/profile/<user_id>")
 def profile(user_id):
     profiles = load_json("user_profile.json")
     return jsonify(profiles.get(user_id, {}))
-
 
 @app.route("/profile/update/<user_id>", methods=["POST"])
 def update_profile(user_id):
@@ -44,35 +39,23 @@ def update_profile(user_id):
     save_json("user_profile.json", profiles)
     return jsonify({"message": "Profile updated."})
 
-
 @app.route("/score/<user_id>")
 def score(user_id):
-    history = load_json("user_history.json")
-    return jsonify({user_id: len(history.get(user_id, [])) * 20})
-
+    return jsonify({user_id: 0})  # No longer tracked
 
 @app.route("/leaderboard")
 def leaderboard():
-    history = load_json("user_history.json")
-    scores = [{"user_id": u, "score": len(h) * 20} for u, h in history.items()]
-    scores.sort(key=lambda x: x["score"], reverse=True)
-    return jsonify(scores)
-
+    return jsonify([])  # No leaderboard logic needed
 
 @app.route("/history/<user_id>")
 def history(user_id):
-    history = load_json("user_history.json")
-    return jsonify(history.get(user_id, []))
-
+    return jsonify([])  # No local history
 
 @app.route("/task/fetch/<user_id>")
 def fetch_task(user_id):
     lang = request.args.get("lang", "en")
-    topic = request.args.get("topic")
-    complexity = request.args.get("complexity")
-
-    completed = load_json("completed_tasks.json")
-    user_done = set(completed.get(user_id, []))
+    topic = request.args.get("topic", None)
+    complexity = request.args.get("complexity", None)
 
     params = {"lang": lang}
     if topic:
@@ -95,12 +78,11 @@ def fetch_task(user_id):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-    task = next((t for t in task_list if t['id'] not in user_done), None)
-    if not task:
+    # Just return the first task (no filtering)
+    if not task_list:
         return jsonify({"error": "No new task available"})
 
-    return jsonify(task)
-
+    return jsonify(task_list[0])
 
 @app.route("/task/<task_id>/submit", methods=["POST", "OPTIONS"])
 def submit_answer(task_id):
@@ -115,23 +97,21 @@ def submit_answer(task_id):
         solution = data["solution"]
         question = data["question"]
         track_id = data["track_id"]
-
-        submission = {
-            "id": task_id,
-            "track_id": track_id,
-            "question": question,
-            "label": solution,
-            "confidence": 1.0,
-            "timestamp": datetime.utcnow().isoformat()
-        }
-
-        print("Submission payload:", submission)
-
     except Exception as e:
         print("Error reading JSON body:", str(e))
         return jsonify({"error": "Invalid JSON body"}), 400
 
-    # Forward to CrowdLabel
+    submission = {
+        "id": task_id,
+        "track_id": track_id,
+        "question": question,
+        "label": solution,
+        "confidence": 1.0,
+        "timestamp": datetime.utcnow().isoformat()
+    }
+
+    print("Submission payload:", submission)
+
     try:
         headers = {
             "Content-Type": "application/json",
@@ -149,34 +129,10 @@ def submit_answer(task_id):
     except Exception as e:
         return jsonify({"error": f"Submission exception: {str(e)}"}), 500
 
-    # Save locally
-    completed = load_json("completed_tasks.json")
-    completed.setdefault(user_id, []).append(task_id)
-    save_json("completed_tasks.json", completed)
-
-    history = load_json("user_history.json")
-    history.setdefault(user_id, []).append(submission)
-    save_json("user_history.json", history)
-
-    # Reward system
-    total_tasks = len(history[user_id])
-    badge = None
-    reward = None
-    if total_tasks == 3:
-        badge = "silver"
-    elif total_tasks == 6:
-        badge = "gold"
-    elif total_tasks >= 12:
-        reward = "https://chatbot.example.com/free-access"
-
     return jsonify({
-        "message": "Answer recorded",
-        "confidence": 1.0,
-        "badge": badge,
-        "reward": reward
-    })
-
-
+        "message": "Submission forwarded to CrowdLabel successfully.",
+        "confidence": 1.0
+    }), 200
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
