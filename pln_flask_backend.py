@@ -4,7 +4,6 @@ import json
 import os
 from datetime import datetime
 import requests
-import certifi
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
@@ -78,12 +77,12 @@ def history(user_id):
     history = load_json("user_history.json")
     return jsonify(history.get(user_id, []))
 
+
 @app.route("/task/fetch/<user_id>")
 def fetch_task(user_id):
-    import certifi
     lang = request.args.get("lang", "en")
-    topic = request.args.get("topic")
-    complexity = request.args.get("complexity")
+    topic = request.args.get("topic", None)
+    complexity = request.args.get("complexity", None)
 
     if lang not in SUPPORTED_LANGUAGES:
         return jsonify({"error": f"Unsupported language: {lang}"}), 400
@@ -96,23 +95,23 @@ def fetch_task(user_id):
     user_done = set(completed.get(user_id, []))
 
     params = {"lang": lang}
-    if topic: params["topic"] = topic
-    if complexity: params["complexity"] = complexity
+    if topic:
+        params["topic"] = topic
+    if complexity:
+        params["complexity"] = complexity
 
     headers = {"X-API-Key": "OkYLZD1-ZF0e9WV1wI5Naela5HhyVC6d"}
 
     try:
-        print(f"\n📡 Fetching from CrowdLabel: {params}")
         res = requests.get(
             "https://crowdlabel.tii.ae/api/2025.2/tasks/pick",
             params=params,
             headers=headers,
-            timeout=15,
-            verify=certifi.where()
+            timeout=10,
+            verify=False  # WARNING: SSL bypassed
         )
 
-        print(f"🌐 CrowdLabel status: {res.status_code}")
-        print("📝 Response text:", res.text)
+        print("CrowdLabel fetch response:", res.status_code, res.text)
 
         if res.status_code != 200:
             return jsonify({"error": "Failed to fetch task", "details": res.text}), 500
@@ -127,15 +126,8 @@ def fetch_task(user_id):
 
         return jsonify(task)
 
-    except requests.exceptions.SSLError as ssl_err:
-        print("❌ SSL ERROR:", ssl_err)
-        return jsonify({"error": "SSL Certificate Error", "details": str(ssl_err)}), 500
-
     except Exception as e:
-        print("❌ General Error:", str(e))
-        return jsonify({"error": "General Exception", "details": str(e)}), 500
-
-
+        return jsonify({"error": "Exception occurred while fetching task", "details": str(e)}), 500
 
 
 @app.route("/task/<task_id>/submit", methods=["POST", "OPTIONS"])
@@ -177,7 +169,7 @@ def submit_answer(task_id):
             headers=headers,
             json=submission,
             timeout=10,
-            verify=certifi.where()
+            verify=False  # WARNING: SSL bypassed
         )
 
         print("CrowdLabel response status:", res.status_code)
@@ -188,13 +180,6 @@ def submit_answer(task_id):
                 "error": "Failed to submit to CrowdLabel",
                 "details": res.text
             }), 500
-
-    except requests.exceptions.SSLError as ssl_err:
-        print("SSL error:", ssl_err)
-        return jsonify({
-            "error": "SSL verification failed",
-            "details": str(ssl_err)
-        }), 500
 
     except Exception as e:
         print("General submission error:", str(e))
