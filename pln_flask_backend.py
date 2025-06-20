@@ -4,10 +4,19 @@ import json
 import os
 from datetime import datetime
 import requests
-import certifi  # ✅ Add certifi to use trusted CA certificates
+import certifi
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
+
+SUPPORTED_LANGUAGES = {"en", "ar"}
+SUPPORTED_TOPICS = {
+    "animals", "construction-site", "fashion", "garage-workshop",
+    "kitchen", "living-room", "medical-field", "music", "office",
+    "school", "uae", "underwater"
+}
+SUPPORTED_COMPLEXITY = {"1", "2", "3", "4"}
+
 
 def load_json(path):
     if os.path.exists(path):
@@ -15,19 +24,28 @@ def load_json(path):
             return json.load(f)
     return {}
 
+
 def save_json(path, data):
     with open(path, "w") as f:
         json.dump(data, f, indent=2)
+
+
+@app.route("/")
+def index():
+    return jsonify({"message": "Peripheral API is live!"}), 200
+
 
 @app.route("/users")
 def users():
     users_data = load_json("user_profile.json")
     return jsonify(list(users_data.keys()))
 
+
 @app.route("/profile/<user_id>")
 def profile(user_id):
     profiles = load_json("user_profile.json")
     return jsonify(profiles.get(user_id, {}))
+
 
 @app.route("/profile/update/<user_id>", methods=["POST"])
 def update_profile(user_id):
@@ -40,10 +58,12 @@ def update_profile(user_id):
     save_json("user_profile.json", profiles)
     return jsonify({"message": "Profile updated."})
 
+
 @app.route("/score/<user_id>")
 def score(user_id):
     history = load_json("user_history.json")
     return jsonify({user_id: len(history.get(user_id, [])) * 20})
+
 
 @app.route("/leaderboard")
 def leaderboard():
@@ -52,58 +72,61 @@ def leaderboard():
     scores.sort(key=lambda x: x["score"], reverse=True)
     return jsonify(scores)
 
+
 @app.route("/history/<user_id>")
 def history(user_id):
     history = load_json("user_history.json")
     return jsonify(history.get(user_id, []))
 
+
 @app.route("/task/fetch/<user_id>")
 def fetch_task(user_id):
+    lang = request.args.get("lang", "en")
+    topic = request.args.get("topic", None)
+    complexity = request.args.get("complexity", None)
+
+    if lang not in SUPPORTED_LANGUAGES:
+        return jsonify({"error": f"Unsupported language: {lang}"}), 400
+    if topic and topic not in SUPPORTED_TOPICS:
+        return jsonify({"error": f"Unsupported topic: {topic}"}), 400
+    if complexity and complexity not in SUPPORTED_COMPLEXITY:
+        return jsonify({"error": f"Unsupported complexity: {complexity}"}), 400
+
+    completed = load_json("completed_tasks.json")
+    user_done = set(completed.get(user_id, []))
+
+    params = {"lang": lang}
+    if topic:
+        params["topic"] = topic
+    if complexity:
+        params["complexity"] = complexity
+
+    headers = {"X-API-Key": "OkYLZD1-ZF0e9WV1wI5Naela5HhyVC6d"}
+
     try:
-        lang = request.args.get("lang", "en")
-        topic = request.args.get("topic", None)
-        complexity = request.args.get("complexity", None)
-
-        print(f"\n🔍 Fetching task for: {user_id}")
-        print(f"Params: lang={lang}, topic={topic}, complexity={complexity}")
-
-        completed = load_json("completed_tasks.json")
-        user_done = set(completed.get(user_id, []))
-        print(f"✅ Completed tasks: {user_done}")
-
-        params = {"lang": lang}
-        if topic:
-            params["topic"] = topic
-        if complexity:
-            params["complexity"] = complexity
-
-        headers = {"x-api-key": "OkYLZD1-ZF0e9WV1wI5Naela5HhyVC6d"}
-
-        print("🌐 Sending request to CrowdLabel...")
         res = requests.get(
             "https://crowdlabel.tii.ae/api/2025.2/tasks/pick",
-            headers=headers,
             params=params,
+            headers=headers,
             verify=certifi.where()
         )
-        print(f"🟢 Status: {res.status_code}")
-        print(f"📩 Response: {res.text}")
+        print("CrowdLabel fetch response:", res.status_code, res.text)
 
         if res.status_code != 200:
-            return jsonify({"error": "CrowdLabel fetch failed", "details": res.text}), 500
+            return jsonify({"error": "Failed to fetch task", "details": res.text}), 500
 
         task_list = res.json()
-        task = next((t for t in task_list if t["id"] not in user_done), None)
+        if not isinstance(task_list, list) or not task_list:
+            return jsonify({"error": "No tasks available or API issue"}), 500
 
+        task = next((t for t in task_list if t['id'] not in user_done), None)
         if not task:
-            return jsonify({"error": "No new task available"}), 404
+            return jsonify({"error": "No new task available"})
 
         return jsonify(task)
 
     except Exception as e:
-        print(f"❌ Error in fetch_task: {str(e)}")
-        return jsonify({"error": "Exception in fetch_task", "details": str(e)}), 500
-
+        return jsonify({"error": "Exception occurred while fetching task", "details": str(e)}), 500
 
 
 @app.route("/task/<task_id>/submit", methods=["POST", "OPTIONS"])
@@ -138,14 +161,14 @@ def submit_answer(task_id):
     try:
         headers = {
             "Content-Type": "application/json",
-            "x-api-key": "OkYLZD1-ZF0e9WV1wI5Naela5HhyVC6d"
+            "X-API-Key": "OkYLZD1-ZF0e9WV1wI5Naela5HhyVC6d"
         }
         res = requests.post(
             f"https://crowdlabel.tii.ae/api/2025.2/tasks/{task_id}/submit",
             headers=headers,
             json=submission,
             timeout=10,
-            verify=certifi.where()  # ✅ trust certificate here too
+            verify=certifi.where()
         )
 
         print("CrowdLabel response status:", res.status_code)
