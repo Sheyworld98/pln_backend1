@@ -1,4 +1,4 @@
-﻿from flask import Flask, request, jsonify
+﻿from flask import Flask, request, jsonify 
 from flask_cors import CORS
 import json
 import os
@@ -41,21 +41,29 @@ def update_profile(user_id):
 
 @app.route("/score/<user_id>")
 def score(user_id):
-    return jsonify({user_id: 0})  # No longer tracked
+    history = load_json("user_history.json")
+    return jsonify({user_id: len(history.get(user_id, [])) * 20})
 
 @app.route("/leaderboard")
 def leaderboard():
-    return jsonify([])  # No leaderboard logic needed
+    history = load_json("user_history.json")
+    scores = [{"user_id": u, "score": len(h) * 20} for u, h in history.items()]
+    scores.sort(key=lambda x: x["score"], reverse=True)
+    return jsonify(scores)
 
 @app.route("/history/<user_id>")
 def history(user_id):
-    return jsonify([])  # No local history
+    history = load_json("user_history.json")
+    return jsonify(history.get(user_id, []))
 
 @app.route("/task/fetch/<user_id>")
 def fetch_task(user_id):
     lang = request.args.get("lang", "en")
     topic = request.args.get("topic", None)
     complexity = request.args.get("complexity", None)
+
+    completed = load_json("completed_tasks.json")
+    user_done = set(completed.get(user_id, []))
 
     params = {"lang": lang}
     if topic:
@@ -78,11 +86,11 @@ def fetch_task(user_id):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-    # Just return the first task (no filtering)
-    if not task_list:
+    task = next((t for t in task_list if t['id'] not in user_done), None)
+    if not task:
         return jsonify({"error": "No new task available"})
 
-    return jsonify(task_list[0])
+    return jsonify(task)
 
 @app.route("/task/<task_id>/submit", methods=["POST", "OPTIONS"])
 def submit_answer(task_id):
@@ -98,8 +106,8 @@ def submit_answer(task_id):
         question = data["question"]
         track_id = data["track_id"]
     except Exception as e:
-        print("Submission exception:", str(e))
-        return jsonify({"error": f"Submission exception: {str(e)}"}), 500
+        print("Error reading JSON body:", str(e))
+        return jsonify({"error": "Invalid JSON body"}), 400
 
     submission = {
         "id": task_id,
@@ -113,25 +121,27 @@ def submit_answer(task_id):
     print("Submission payload:", submission)
 
     try:
-    res = requests.post(
-        f"https://crowdlabel.tii.ae/api/2025.2/tasks/{task_id}/submit",
-        headers=headers,
-        json=submission,
-        verify=False
-    )
-    if res.status_code != 200:
-        print("CrowdLabel submission failed:", res.status_code, res.text)
-        return jsonify({"error": "Failed to submit to CrowdLabel"}), 500
-
-except Exception as e:
-    print("Submission exception:", str(e))  
-    return jsonify({"error": f"Submission exception: {str(e)}"}), 500
-
+        headers = {
+            "Content-Type": "application/json",
+            "X-API-Key": "OkYLZD1-ZF0e9WV1wI5Naela5HhyVC6d"
+        }
+        res = requests.post(
+            f"https://crowdlabel.tii.ae/api/2025.2/tasks/{task_id}/submit",
+            headers=headers,
+            json=submission,
+            verify=False
+        )
+        print("CrowdLabel response:", res.status_code, res.text)
+        if res.status_code != 200:
+            print("CrowdLabel submission failed:", res.status_code, res.text)
+            return jsonify({"error": "Failed to submit to CrowdLabel"}), 500
+    except Exception as e:
+        return jsonify({"error": f"Submission exception: {str(e)}"}), 500
 
     return jsonify({
         "message": "Answer submitted successfully!",
         "confidence": 1.0
-    }), 200
+    })
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
