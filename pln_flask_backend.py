@@ -98,8 +98,8 @@ def submit_answer(task_id):
         question = data["question"]
         track_id = data["track_id"]
     except Exception as e:
-        print("Error reading JSON body:", str(e))
-        return jsonify({"error": "Invalid JSON body"}), 400
+        print("Submission exception:", str(e))
+        return jsonify({"error": f"Submission exception: {str(e)}"}), 500
 
     submission = {
         "id": task_id,
@@ -123,8 +123,7 @@ def submit_answer(task_id):
     json=submission,
     verify=False
 )
-
-print("CrowdLabel submission response:", res.status_code, res.text)  
+ 
 
 if res.status_code != 200:
     print("CrowdLabel submission failed:", res.status_code, res.text)
