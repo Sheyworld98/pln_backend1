@@ -128,10 +128,14 @@ def fetch_task(user_id):
 
 
 
-@app.route("/tasks/<task_id>/submit", methods=["POST", "OPTIONS"])
+@app.route("/tasks/<task_id>/submit", methods=["POST"])
 def submit_answer(task_id):
-    if request.method == "OPTIONS":
-        return jsonify({"message": "CORS preflight OK"}), 200
+    data = request.get_json()
+    user_id = data["user_id"]
+    solution = data["solution"]
+    question = data["question"]
+    track_id = data["track_id"]
+
 
     try:
         data = request.get_json(force=True)
