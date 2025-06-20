@@ -113,21 +113,19 @@ def submit_answer(task_id):
     print("Submission payload:", submission)
 
     try:
-        headers = {
-            "Content-Type": "application/json",
-            "X-API-Key": "OkYLZD1-ZF0e9WV1wI5Naela5HhyVC6d"
-        }
-        res = requests.post(
-    f"https://crowdlabel.tii.ae/api/2025.2/tasks/{task_id}/submit",
-    headers=headers,
-    json=submission,
-    verify=False
-)
- 
+    res = requests.post(
+        f"https://crowdlabel.tii.ae/api/2025.2/tasks/{task_id}/submit",
+        headers=headers,
+        json=submission,
+        verify=False
+    )
+    if res.status_code != 200:
+        print("CrowdLabel submission failed:", res.status_code, res.text)
+        return jsonify({"error": "Failed to submit to CrowdLabel"}), 500
 
-if res.status_code != 200:
-    print("CrowdLabel submission failed:", res.status_code, res.text)
-    return jsonify({"error": "Failed to submit to CrowdLabel"}), 500
+except Exception as e:
+    print("Submission exception:", str(e))  
+    return jsonify({"error": f"Submission exception: {str(e)}"}), 500
 
 
     return jsonify({
