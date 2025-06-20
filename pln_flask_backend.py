@@ -40,56 +40,52 @@ def update_profile(user_id):
     save_json("user_profile.json", profiles)
     return jsonify({"message": "Profile updated."})
 
-import certifi  # Make sure this is at the top
-
 @app.route("/task/fetch/<user_id>")
 def fetch_task(user_id):
-    from urllib.parse import urlencode
-    lang = request.args.get("lang", "en")
-    topic = request.args.get("topic")
-    complexity = request.args.get("complexity")
-
-    completed = load_json("completed_tasks.json")
-    user_done = set(completed.get(user_id, []))
-
-    params = {"lang": lang}
-    if topic:
-        params["topic"] = topic
-    if complexity:
-        params["complexity"] = complexity
-
-    headers = {
-        "x-api-key": "OkYLZD1-ZF0e9WV1wI5Naela5HhyVC6d"
-    }
-
     try:
-        full_url = f"https://crowdlabel.tii.ae/api/2025.2/tasks/pick?{urlencode(params)}"
-        print("🟡 Fetching from CrowdLabel:", full_url)
+        lang = request.args.get("lang", "en")
+        topic = request.args.get("topic", None)
+        complexity = request.args.get("complexity", None)
+
+        print(f"\n🔍 Fetching task for: {user_id}")
+        print(f"Params: lang={lang}, topic={topic}, complexity={complexity}")
+
+        completed = load_json("completed_tasks.json")
+        user_done = set(completed.get(user_id, []))
+        print(f"✅ Completed tasks: {user_done}")
+
+        params = {"lang": lang}
+        if topic:
+            params["topic"] = topic
+        if complexity:
+            params["complexity"] = complexity
+
+        headers = {"x-api-key": "OkYLZD1-ZF0e9WV1wI5Naela5HhyVC6d"}
+
+        print("🌐 Sending request to CrowdLabel...")
         res = requests.get(
             "https://crowdlabel.tii.ae/api/2025.2/tasks/pick",
-            params=params,
             headers=headers,
+            params=params,
             verify=certifi.where()
         )
-
-        print("🟢 Status Code:", res.status_code)
-        print("📩 Response Text:", res.text)
+        print(f"🟢 Status: {res.status_code}")
+        print(f"📩 Response: {res.text}")
 
         if res.status_code != 200:
-            return jsonify({"error": "Failed to fetch task", "details": res.text}), 500
+            return jsonify({"error": "CrowdLabel fetch failed", "details": res.text}), 500
 
         task_list = res.json()
+        task = next((t for t in task_list if t["id"] not in user_done), None)
+
+        if not task:
+            return jsonify({"error": "No new task available"}), 404
+
+        return jsonify(task)
 
     except Exception as e:
-        import traceback
-        print("❌ FETCH TASK EXCEPTION:\n", traceback.format_exc())
-        return jsonify({"error": "Exception while fetching task", "details": str(e)}), 500
-
-    task = next((t for t in task_list if t['id'] not in user_done), None)
-    if not task:
-        return jsonify({"error": "No new task available"})
-
-    return jsonify(task)
+        print(f"❌ Error in fetch_task: {str(e)}")
+        return jsonify({"error": "Exception in fetch_task", "details": str(e)}), 500
 
 
 
