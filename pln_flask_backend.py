@@ -131,7 +131,7 @@ def submit_answer(task_id):
             headers=headers,
             json=submission,
             timeout=10
-            # verify=True  
+            verify=False  
         )
 
         print("CrowdLabel response status:", res.status_code)
