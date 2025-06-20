@@ -100,74 +100,70 @@ def fetch_task(user_id):
 
 @app.route("/task/<task_id>/submit", methods=["POST"])
 def submit_answer(task_id):
-    if request.method == "OPTIONS":
-        return jsonify({"message": "CORS preflight OK"}), 200
-
     try:
         data = request.get_json(force=True)
-        user_id = data["user_id"]
-        solution = data["solution"]   # should be a letter: "a", "b", etc.
-        track_id = data["track_id"]
-        question = data["question"]   # only for local history, not sent to CrowdLabel
+        if not data:
+            return jsonify({"error": "Invalid input", "details": "Empty JSON body"}), 400
     except Exception as e:
         return jsonify({"error": "Invalid input", "details": str(e)}), 400
 
-    # Payload as per CrowdLabel spec
-    crowdlabel_payload = {
+    user_id = data.get("user_id")
+    solution = data.get("solution")
+    question = data.get("question")
+    track_id = data.get("track_id")
+
+    if not all([user_id, solution, question, track_id]):
+        return jsonify({"error": "Missing required fields"}), 400
+
+    submission = {
+        "id": task_id,
         "track_id": track_id,
-        "solution": solution
+        "question": question,
+        "solution": solution,
+        "confidence": 1.0,
+        "timestamp": datetime.utcnow().isoformat()
     }
 
     headers = {
-        "Content-Type": "application/json",
-        "X-API-Key": "OkYLZD1-ZF0e9WV1wI5Naela5HhyVC6d"
+        "X-API-Key": "OkYLZD1-ZF0e9WV1wI5Naela5HhyVC6d",
+        "Content-Type": "application/x-www-form-urlencoded"
     }
 
     try:
         res = requests.post(
             f"https://crowdlabel.tii.ae/api/2025.2/tasks/{task_id}/submit",
+            data={  # NOT json=
+                "track_id": track_id,
+                "solution": solution
+            },
             headers=headers,
-            json=crowdlabel_payload,
             timeout=10,
-            verify=False  # SSL bypassed
+            verify=False
         )
-
-        print("CrowdLabel response:", res.status_code, res.text)
 
         if res.status_code != 200:
             return jsonify({
                 "error": "Failed to submit to CrowdLabel",
                 "details": res.text
             }), 500
-
-        response_json = res.json()
-        confidence = response_json.get("confidence", 1.0)
-
     except Exception as e:
-        return jsonify({"error": "Submission exception", "details": str(e)}), 500
+        return jsonify({"error": "Submission error", "details": str(e)}), 500
 
-    # Save locally for history/leaderboard
-    submission_record = {
-        "id": task_id,
-        "track_id": track_id,
-        "question": question,
-        "label": solution,
-        "confidence": confidence,
-        "timestamp": datetime.utcnow().isoformat()
-    }
-
+    # Save to history
     history = load_json("user_history.json")
-    history.setdefault(user_id, []).append(submission_record)
+    history.setdefault(user_id, []).append(submission)
     save_json("user_history.json", history)
 
+    # Save to completed
     completed = load_json("completed_tasks.json")
     completed.setdefault(user_id, []).append(task_id)
     save_json("completed_tasks.json", completed)
 
     return jsonify({
-        "message": "Answer submitted successfully!",
-        "confidence": confidence
-    }), 200
+        "message": "Answer recorded",
+        "confidence": 1.0
+    })
+
 
 
 
