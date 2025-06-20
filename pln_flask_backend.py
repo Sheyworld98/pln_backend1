@@ -105,22 +105,23 @@ def submit_answer(task_id):
         solution = data["solution"]
         question = data["question"]
         track_id = data["track_id"]
+
+        submission = {
+            "id": task_id,
+            "track_id": track_id,
+            "question": question,
+            "label": solution,
+            "confidence": 1.0,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+
+        print("Submission payload:", submission)
+
     except Exception as e:
         print("Error reading JSON body:", str(e))
-        return jsonify({"error": "Invalid JSON body"}), 400
+        return jsonify({"error": "Invalid JSON body", "details": str(e)}), 400
 
-    submission = {
-        "id": task_id,
-        "track_id": track_id,
-        "question": question,
-        "label": solution,
-        "confidence": 1.0,
-        "timestamp": datetime.utcnow().isoformat()
-    }
-
-    print("Submission payload:", submission)
-
-        try:
+    try:
         headers = {
             "Content-Type": "application/json",
             "X-API-Key": "OkYLZD1-ZF0e9WV1wI5Naela5HhyVC6d"
@@ -129,26 +130,38 @@ def submit_answer(task_id):
             f"https://crowdlabel.tii.ae/api/2025.2/tasks/{task_id}/submit",
             headers=headers,
             json=submission,
-            timeout=10  
+            timeout=10
             # verify=True  
         )
+
         print("CrowdLabel response status:", res.status_code)
         print("CrowdLabel response text:", res.text)
 
         if res.status_code != 200:
-            return jsonify({"error": "Failed to submit to CrowdLabel", "details": res.text}), 500
+            return jsonify({
+                "error": "Failed to submit to CrowdLabel",
+                "details": res.text
+            }), 500
+
     except requests.exceptions.SSLError as ssl_err:
         print("SSL error:", ssl_err)
-        return jsonify({"error": "SSL verification failed", "details": str(ssl_err)}), 500
+        return jsonify({
+            "error": "SSL verification failed",
+            "details": str(ssl_err)
+        }), 500
+
     except Exception as e:
         print("General submission error:", str(e))
-        return jsonify({"error": "Submission exception", "details": str(e)}), 500
-
+        return jsonify({
+            "error": "Submission exception",
+            "details": str(e)
+        }), 500
 
     return jsonify({
         "message": "Answer submitted successfully!",
         "confidence": 1.0
-    })
+    }), 200
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
