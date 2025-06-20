@@ -103,6 +103,7 @@ def submit_answer(task_id):
     if request.method == "OPTIONS":
         return jsonify({"message": "CORS preflight OK"}), 200
 
+
     data = request.get_json()
     user_id = data["user_id"]
     solution = data["solution"]
