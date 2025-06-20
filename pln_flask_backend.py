@@ -130,7 +130,7 @@ def submit_answer(task_id):
         return jsonify({"error": f"Submission exception: {str(e)}"}), 500
 
     return jsonify({
-        "message": "Submission forwarded to CrowdLabel successfully.",
+        "message": "Answer submitted successfully!",
         "confidence": 1.0
     }), 200
 
