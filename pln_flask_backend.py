@@ -40,17 +40,7 @@ def update_profile(user_id):
     save_json("user_profile.json", profiles)
     return jsonify({"message": "Profile updated."})
 
-@app.route("/score/<user_id>")
-def score(user_id):
-    history = load_json("user_history.json")
-    return jsonify({user_id: len(history.get(user_id, [])) * 20})
-
-@app.route("/leaderboard")
-def leaderboard():
-    history = load_json("user_history.json")
-    scores = [{"user_id": u, "score": len(h) * 20} for u, h in history.items()]
-    scores.sort(key=lambda x: x["score"], reverse=True)
-    return jsonify(scores)
+import certifi
 
 @app.route("/task/fetch/<user_id>")
 def fetch_task(user_id):
@@ -74,24 +64,33 @@ def fetch_task(user_id):
             "https://crowdlabel.tii.ae/api/2025.2/tasks/pick",
             params=params,
             headers=headers,
-            verify="/usr/local/lib/python3.11/site-packages/certifi/cacert.pem"  # or certifi.where()
+            verify=certifi.where()  # 💡 Uses trusted cert bundle
         )
+
         print("CrowdLabel fetch status:", res.status_code)
         print("CrowdLabel response:", res.text)
 
         if res.status_code != 200:
-            return jsonify({"error": "Failed to fetch task", "details": res.text}), 500
+            return jsonify({
+                "error": "Failed to fetch task",
+                "details": res.text
+            }), 500
 
         task_list = res.json()
     except Exception as e:
-        print("FETCH TASK ERROR:", str(e))  # 👈 print the full exception
-        return jsonify({"error": "Fetch task failed", "details": str(e)}), 500
+        import traceback
+        print("FETCH TASK EXCEPTION:\n", traceback.format_exc())  # 👈 FULL stack trace
+        return jsonify({
+            "error": "Fetch task failed",
+            "details": str(e)
+        }), 500
 
     task = next((t for t in task_list if t['id'] not in user_done), None)
     if not task:
         return jsonify({"error": "No new task available"})
 
     return jsonify(task)
+
 
 
 
