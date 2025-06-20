@@ -98,22 +98,25 @@ def fetch_task(user_id):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-@app.route("/task/<task_id>/submit", methods=["POST", "OPTIONS"])
+@app.route("/task/submit/<task_id>", methods=["POST", "OPTIONS"])
 def submit_answer(task_id):
     if request.method == "OPTIONS":
         return jsonify({"message": "CORS preflight OK"}), 200
 
+    try:
+        data = request.get_json(force=True)
+        user_id = data["user_id"]
+        solution = data["solution"]   # should be a letter: "a", "b", etc.
+        track_id = data["track_id"]
+        question = data["question"]   # only for local history, not sent to CrowdLabel
+    except Exception as e:
+        return jsonify({"error": "Invalid input", "details": str(e)}), 400
 
-    data = request.get_json()
-    user_id = data["user_id"]
-    solution = data["solution"]
-    question = data["question"]
-    track_id = data["track_id"]
-
-    submission = {
-    "track_id": track_id,
-    "solution": solution  # this must be like "a", "b", "c", etc.
-}
+    # Payload as per CrowdLabel spec
+    crowdlabel_payload = {
+        "track_id": track_id,
+        "solution": solution
+    }
 
     headers = {
         "Content-Type": "application/json",
@@ -124,17 +127,37 @@ def submit_answer(task_id):
         res = requests.post(
             f"https://crowdlabel.tii.ae/api/2025.2/tasks/{task_id}/submit",
             headers=headers,
-            json=submission,
+            json=crowdlabel_payload,
             timeout=10,
-            verify=False
+            verify=False  # SSL bypassed
         )
+
+        print("CrowdLabel response:", res.status_code, res.text)
+
         if res.status_code != 200:
-            return jsonify({"error": "Failed to submit to CrowdLabel", "details": res.text}), 500
+            return jsonify({
+                "error": "Failed to submit to CrowdLabel",
+                "details": res.text
+            }), 500
+
+        response_json = res.json()
+        confidence = response_json.get("confidence", 1.0)
+
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": "Submission exception", "details": str(e)}), 500
+
+    # Save locally for history/leaderboard
+    submission_record = {
+        "id": task_id,
+        "track_id": track_id,
+        "question": question,
+        "label": solution,
+        "confidence": confidence,
+        "timestamp": datetime.utcnow().isoformat()
+    }
 
     history = load_json("user_history.json")
-    history.setdefault(user_id, []).append(submission)
+    history.setdefault(user_id, []).append(submission_record)
     save_json("user_history.json", history)
 
     completed = load_json("completed_tasks.json")
@@ -142,9 +165,10 @@ def submit_answer(task_id):
     save_json("completed_tasks.json", completed)
 
     return jsonify({
-        "message": "Answer recorded",
-        "confidence": 1.0
-    })
+        "message": "Answer submitted successfully!",
+        "confidence": confidence
+    }), 200
+
 
 
 if __name__ == "__main__":
