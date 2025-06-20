@@ -92,7 +92,7 @@ def fetch_task(user_id):
         if not task:
             return jsonify({"error": "No new task available"}), 404
 
-        return jsonifyreturn jsonify(task)
+        return jsonify(task)
 
 
     except Exception as e:
