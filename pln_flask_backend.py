@@ -6,7 +6,7 @@ from datetime import datetime
 import requests
 
 app = Flask(__name__)
-CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
+CORS(app)
 
 SUPPORTED_LANGUAGES = {"en", "ar"}
 SUPPORTED_TOPICS = {
@@ -172,31 +172,18 @@ def submit_answer(task_id):
             verify=False  # WARNING: SSL bypassed
         )
 
-        print("CrowdLabel response status:", res.status_code)
-        print("CrowdLabel response text:", res.text)
-
-        if res.status_code != 200:
-            return jsonify({
-                "error": "Failed to submit to CrowdLabel",
-                "details": res.text
-            }), 500
-
-        # Save to local history
+        
+        
         history = load_json("user_history.json")
         history.setdefault(user_id, []).append(submission)
         save_json("user_history.json", history)
 
-        # Save to completed
+        
         completed = load_json("completed_tasks.json")
         completed.setdefault(user_id, []).append(task_id)
         save_json("completed_tasks.json", completed)
 
-    except Exception as e:
-        print("General submission error:", str(e))
-        return jsonify({
-            "error": "Submission exception",
-            "details": str(e)
-        }), 500
+   
 
     return jsonify({
         "message": "Answer submitted successfully!",
