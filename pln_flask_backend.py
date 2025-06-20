@@ -130,7 +130,7 @@ def fetch_task(user_id):
         return jsonify({"error": "Exception occurred while fetching task", "details": str(e)}), 500
 
 
-@app.route("/task/submit/<task_id>", methods=["POST", "OPTIONS"])
+@app.route("/tasks/<task_id>/submit", methods=["POST", "OPTIONS"])
 def submit_answer(task_id):
     if request.method == "OPTIONS":
         return jsonify({"message": "CORS preflight OK"}), 200
