@@ -106,7 +106,6 @@ def fetch_task(user_id):
 
 
 
-
 @app.route("/task/<task_id>/submit", methods=["POST", "OPTIONS"])
 def submit_answer(task_id):
     if request.method == "OPTIONS":
