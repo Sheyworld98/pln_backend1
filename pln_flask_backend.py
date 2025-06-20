@@ -8,43 +8,25 @@ import requests
 app = Flask(__name__)
 CORS(app)
 
-SUPPORTED_LANGUAGES = {"en", "ar"}
-SUPPORTED_TOPICS = {
-    "animals", "construction-site", "fashion", "garage-workshop",
-    "kitchen", "living-room", "medical-field", "music", "office",
-    "school", "uae", "underwater"
-}
-SUPPORTED_COMPLEXITY = {"1", "2", "3", "4"}
-
-
 def load_json(path):
     if os.path.exists(path):
         with open(path, "r") as f:
             return json.load(f)
     return {}
 
-
 def save_json(path, data):
     with open(path, "w") as f:
         json.dump(data, f, indent=2)
-
-
-@app.route("/")
-def index():
-    return jsonify({"message": "Peripheral API is live!"}), 200
-
 
 @app.route("/users")
 def users():
     users_data = load_json("user_profile.json")
     return jsonify(list(users_data.keys()))
 
-
 @app.route("/profile/<user_id>")
 def profile(user_id):
     profiles = load_json("user_profile.json")
     return jsonify(profiles.get(user_id, {}))
-
 
 @app.route("/profile/update/<user_id>", methods=["POST"])
 def update_profile(user_id):
@@ -57,12 +39,10 @@ def update_profile(user_id):
     save_json("user_profile.json", profiles)
     return jsonify({"message": "Profile updated."})
 
-
 @app.route("/score/<user_id>")
 def score(user_id):
     history = load_json("user_history.json")
     return jsonify({user_id: len(history.get(user_id, [])) * 20})
-
 
 @app.route("/leaderboard")
 def leaderboard():
@@ -71,25 +51,16 @@ def leaderboard():
     scores.sort(key=lambda x: x["score"], reverse=True)
     return jsonify(scores)
 
-
 @app.route("/history/<user_id>")
 def history(user_id):
     history = load_json("user_history.json")
     return jsonify(history.get(user_id, []))
-
 
 @app.route("/task/fetch/<user_id>")
 def fetch_task(user_id):
     lang = request.args.get("lang", "en")
     topic = request.args.get("topic", None)
     complexity = request.args.get("complexity", None)
-
-    if lang not in SUPPORTED_LANGUAGES:
-        return jsonify({"error": f"Unsupported language: {lang}"}), 400
-    if topic and topic not in SUPPORTED_TOPICS:
-        return jsonify({"error": f"Unsupported topic: {topic}"}), 400
-    if complexity and complexity not in SUPPORTED_COMPLEXITY:
-        return jsonify({"error": f"Unsupported complexity: {complexity}"}), 400
 
     completed = load_json("completed_tasks.json")
     user_done = set(completed.get(user_id, []))
@@ -108,13 +79,10 @@ def fetch_task(user_id):
             params=params,
             headers=headers,
             timeout=10,
-            verify=False  # WARNING: SSL bypassed
+            verify=False  # SSL bypassed for dev
         )
-
-        print("CrowdLabel fetch response:", res.status_code, res.text)
-
         if res.status_code != 200:
-            return jsonify({"error": "Failed to fetch task", "details": res.text}), 500
+            return jsonify({"error": "Failed to fetch task"}), 500
 
         task_list = res.json()
         if not isinstance(task_list, list) or not task_list:
@@ -122,13 +90,14 @@ def fetch_task(user_id):
 
         task = next((t for t in task_list if t['id'] not in user_done), None)
         if not task:
-            return jsonify({"error": "No new task available"})
+            return jsonify({"error": "No new task available"}), 404
 
-        return jsonify(task)
+        return jsonify({"task": task})
 
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
-
-@app.route("/tasks/<task_id>/submit", methods=["POST"])
+@app.route("/task/submit/<task_id>", methods=["POST"])
 def submit_answer(task_id):
     data = request.get_json()
     user_id = data["user_id"]
@@ -136,60 +105,45 @@ def submit_answer(task_id):
     question = data["question"]
     track_id = data["track_id"]
 
+    submission = {
+        "id": task_id,
+        "track_id": track_id,
+        "question": question,
+        "label": solution,
+        "confidence": 1.0,
+        "timestamp": datetime.utcnow().isoformat()
+    }
+
+    headers = {
+        "Content-Type": "application/json",
+        "X-API-Key": "OkYLZD1-ZF0e9WV1wI5Naela5HhyVC6d"
+    }
 
     try:
-        data = request.get_json(force=True)
-        print("Received data:", json.dumps(data, indent=2))
-
-        user_id = data["user_id"]
-        solution = data["solution"]
-        question = data["question"]
-        track_id = data["track_id"]
-
-        submission = {
-            "id": task_id,
-            "track_id": track_id,
-            "question": question,
-            "label": solution,
-            "confidence": 1.0,
-            "timestamp": datetime.utcnow().isoformat()
-        }
-
-        print("Submission payload:", submission)
-
-    except Exception as e:
-        print("Error reading JSON body:", str(e))
-        return jsonify({"error": "Invalid JSON body", "details": str(e)}), 400
-
-    try:
-        headers = {
-            "Content-Type": "application/json",
-            "X-API-Key": "OkYLZD1-ZF0e9WV1wI5Naela5HhyVC6d"
-        }
         res = requests.post(
             f"https://crowdlabel.tii.ae/api/2025.2/tasks/{task_id}/submit",
             headers=headers,
             json=submission,
             timeout=10,
-            verify=False  # WARNING: SSL bypassed
+            verify=False
         )
+        if res.status_code != 200:
+            return jsonify({"error": "Failed to submit to CrowdLabel", "details": res.text}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
-        
-        
-        history = load_json("user_history.json")
-        history.setdefault(user_id, []).append(submission)
-        save_json("user_history.json", history)
+    history = load_json("user_history.json")
+    history.setdefault(user_id, []).append(submission)
+    save_json("user_history.json", history)
 
-        
-        completed = load_json("completed_tasks.json")
-        completed.setdefault(user_id, []).append(task_id)
-        save_json("completed_tasks.json", completed)
+    completed = load_json("completed_tasks.json")
+    completed.setdefault(user_id, []).append(task_id)
+    save_json("completed_tasks.json", completed)
 
-   
-
-    return jsonify({"message": "Answer recorded", "confidence": 1.0})
-
-
+    return jsonify({
+        "message": "Answer recorded",
+        "confidence": 1.0
+    })
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
