@@ -111,13 +111,9 @@ def submit_answer(task_id):
     track_id = data["track_id"]
 
     submission = {
-        "id": task_id,
-        "track_id": track_id,
-        "question": question,
-        "label": solution,
-        "confidence": 1.0,
-        "timestamp": datetime.utcnow().isoformat()
-    }
+    "track_id": track_id,
+    "solution": solution  # this must be like "a", "b", "c", etc.
+}
 
     headers = {
         "Content-Type": "application/json",
