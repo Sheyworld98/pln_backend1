@@ -63,10 +63,12 @@ def history(user_id):
 
 @app.route("/task/fetch/<user_id>")
 def fetch_task(user_id):
-    user_id = user_id.strip()
+    import certifi
+    import traceback
+
     lang = request.args.get("lang", "en")
-    topic = request.args.get("topic")
-    complexity = request.args.get("complexity")
+    topic = request.args.get("topic", None)
+    complexity = request.args.get("complexity", None)
 
     completed = load_json("completed_tasks.json")
     user_done = set(completed.get(user_id, []))
@@ -86,19 +88,25 @@ def fetch_task(user_id):
             headers=headers,
             verify=certifi.where()
         )
+        print("➡️ Fetch task status code:", res.status_code)
+        print("➡️ Response text:", res.text)
+
         if res.status_code != 200:
-            print("CrowdLabel task fetch failed:", res.text)
-            return jsonify({"error": "Failed to fetch task"}), 500
+            return jsonify({"error": "Failed to fetch task", "details": res.text}), 500
+
         task_list = res.json()
+
     except Exception as e:
-        print("Fetch task exception:", e)
-        return jsonify({"error": str(e)}), 500
+        print("❌ Exception during task fetch:")
+        traceback.print_exc()
+        return jsonify({"error": "Fetch task exception", "details": str(e)}), 500
 
     task = next((t for t in task_list if t['id'] not in user_done), None)
     if not task:
         return jsonify({"error": "No new task available"})
 
     return jsonify(task)
+
 
 @app.route("/task/<task_id>/submit", methods=["POST", "OPTIONS"])
 def submit_answer(task_id):
