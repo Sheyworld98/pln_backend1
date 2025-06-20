@@ -96,59 +96,64 @@ def fetch_task(user_id):
 def submit_answer(task_id):
     try:
         data = request.get_json(force=True)
-        if not data:
-            return jsonify({"error": "Empty request body"}), 400
-    except Exception as e:
-        return jsonify({"error": "Invalid input", "details": str(e)}), 400
+        user_id = data["user_id"]
+        solution = data["solution"]
+        track_id = data["track_id"]
+        question = data.get("question", "")
 
-    user_id = data.get("user_id")
-    solution = data.get("solution")
-    question = data.get("question")
-    track_id = data.get("track_id")
+        submission = {
+            "track_id": track_id,
+            "solution": solution,
+        }
 
-    if not all([user_id, solution, question, track_id]):
-        return jsonify({"error": "Missing required fields"}), 400
+        headers = {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "X-API-Key": "OkYLZD1-ZF0e9WV1wI5Naela5HhyVC6d",
+        }
 
-    submission = {
-        "id": task_id,
-        "track_id": track_id,
-        "question": question,
-        "solution": solution,
-        "confidence": 1.0,
-        "timestamp": datetime.utcnow().isoformat()
-    }
-
-    headers = {
-        "X-API-Key": "OkYLZD1-ZF0e9WV1wI5Naela5HhyVC6d",
-        "Content-Type": "application/x-www-form-urlencoded"
-    }
-
-    try:
         res = requests.post(
             f"https://crowdlabel.tii.ae/api/2025.2/tasks/{task_id}/submit",
-            data={
-                "track_id": track_id,
-                "solution": solution
-            },
             headers=headers,
+            data=submission,
             timeout=10,
-            verify=False
+            verify=False  # SSL bypassed for dev
         )
+
         if res.status_code != 200:
-            return jsonify({"error": "Failed to submit to CrowdLabel", "details": res.text}), 500
+            return jsonify({
+                "error": "Failed to submit to CrowdLabel",
+                "details": res.text
+            }), 500
+
+        result = res.json()
+        confidence = result.get("confidence", 1.0)
+
+        history = load_json("user_history.json")
+        history.setdefault(user_id, []).append({
+            "id": task_id,
+            "track_id": track_id,
+            "question": question,
+            "label": solution,
+            "confidence": confidence,
+            "timestamp": datetime.utcnow().isoformat()
+        })
+        save_json("user_history.json", history)
+
+        completed = load_json("completed_tasks.json")
+        completed.setdefault(user_id, []).append(task_id)
+        save_json("completed_tasks.json", completed)
+
+        return jsonify({
+            "message": "Answer submitted successfully.",
+            "confidence": confidence
+        })
 
     except Exception as e:
-        return jsonify({"error": "Submission error", "details": str(e)}), 500
+        return jsonify({
+            "error": "Something went wrong",
+            "details": str(e)
+        }), 500
 
-    history = load_json("user_history.json")
-    history.setdefault(user_id, []).append(submission)
-    save_json("user_history.json", history)
-
-    completed = load_json("completed_tasks.json")
-    completed.setdefault(user_id, []).append(task_id)
-    save_json("completed_tasks.json", completed)
-
-    return jsonify({"message": "Answer recorded", "confidence": 1.0})
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
