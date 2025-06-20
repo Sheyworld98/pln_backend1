@@ -98,7 +98,7 @@ def fetch_task(user_id):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-@app.route("/task/submit/<task_id>", methods=["POST", "OPTIONS"])
+@app.route("/task/<task_id>/submit", methods=["POST", "OPTIONS"])
 def submit_answer(task_id):
     if request.method == "OPTIONS":
         return jsonify({"message": "CORS preflight OK"}), 200
