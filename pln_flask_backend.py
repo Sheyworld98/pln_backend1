@@ -4,6 +4,7 @@ import json
 import os
 from datetime import datetime
 import requests
+import certifi  # ✅ for SSL verification
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
@@ -59,8 +60,8 @@ def history(user_id):
 @app.route("/task/fetch/<user_id>")
 def fetch_task(user_id):
     lang = request.args.get("lang", "en")
-    topic = request.args.get("topic", None)
-    complexity = request.args.get("complexity", None)
+    topic = request.args.get("topic")
+    complexity = request.args.get("complexity")
 
     completed = load_json("completed_tasks.json")
     user_done = set(completed.get(user_id, []))
@@ -78,7 +79,7 @@ def fetch_task(user_id):
             "https://crowdlabel.tii.ae/api/2025.2/tasks/pick",
             params=params,
             headers=headers,
-            verify=False
+            verify=certifi.where()  # ✅ SSL verification with certifi
         )
         if res.status_code != 200:
             return jsonify({"error": "Failed to fetch task"}), 500
@@ -126,12 +127,13 @@ def submit_answer(task_id):
             "Content-Type": "application/json",
             "X-API-Key": "OkYLZD1-ZF0e9WV1wI5Naela5HhyVC6d"
         }
+
         res = requests.post(
             f"https://crowdlabel.tii.ae/api/2025.2/tasks/{task_id}/submit",
             headers=headers,
             json=submission,
             timeout=10,
-            verify=False  
+            verify=certifi.where()  # ✅ Trust anchor
         )
 
         print("CrowdLabel response status:", res.status_code)
@@ -161,8 +163,6 @@ def submit_answer(task_id):
         "message": "Answer submitted successfully!",
         "confidence": 1.0
     }), 200
-
-
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
