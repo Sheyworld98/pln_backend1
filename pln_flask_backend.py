@@ -8,6 +8,14 @@ import requests
 app = Flask(__name__)
 CORS(app)
 
+SUPPORTED_LANGUAGES = {"en", "ar"}
+SUPPORTED_TOPICS = {
+    "animals", "construction-site", "fashion", "garage-workshop",
+    "kitchen", "living-room", "medical-field", "music", "office",
+    "school", "uae", "underwater"
+}
+SUPPORTED_COMPLEXITY = {"1", "2", "3", "4"}
+
 # --- Utility Functions ---
 def load_json(path):
     if os.path.exists(path):
@@ -58,9 +66,19 @@ def history(user_id):
 @app.route("/task/fetch/<user_id>")
 def fetch_task(user_id):
     lang = request.args.get("lang", "en")
-    topic = request.args.get("topic")
-    complexity = request.args.get("complexity")
-    completed = set(load_json("completed_tasks.json").get(user_id, []))
+    topic = request.args.get("topic", None)
+    complexity = request.args.get("complexity", None)
+
+    # Validate inputs
+    if lang not in SUPPORTED_LANGUAGES:
+        return jsonify({"error": f"Unsupported language: {lang}"}), 400
+    if topic and topic not in SUPPORTED_TOPICS:
+        return jsonify({"error": f"Unsupported topic: {topic}"}), 400
+    if complexity and complexity not in SUPPORTED_COMPLEXITY:
+        return jsonify({"error": f"Unsupported complexity: {complexity}"}), 400
+
+    completed = load_json("completed_tasks.json")
+    user_done = set(completed.get(user_id, []))
 
     params = {"lang": lang}
     if topic:
@@ -75,21 +93,26 @@ def fetch_task(user_id):
             "https://crowdlabel.tii.ae/api/2025.2/tasks/pick",
             params=params,
             headers=headers,
-            timeout=10,
-            verify=False
+            verify=False  # or certifi.where()
         )
+        print("CROWDLABEL RAW RESPONSE:", res.status_code, res.text)
+
         if res.status_code != 200:
-            return jsonify({"error": "Failed to fetch task"}), 500
+            return jsonify({"error": "Failed to fetch task", "details": res.text}), 500
 
         task_list = res.json()
-        task = next((t for t in task_list if t['id'] not in completed), None)
-        if not task:
-            return jsonify({"error": "No new task available"}), 404
 
-        return jsonify({"task": task})
+        if not isinstance(task_list, list) or not task_list:
+            return jsonify({"error": "No tasks available or API issue"}), 500
+
+        task = next((t for t in task_list if t['id'] not in user_done), None)
+        if not task:
+            return jsonify({"error": "No new task available"}), 200
+
+        return jsonify(task)
 
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": "Exception occurred while fetching task", "details": str(e)}), 500
 
 # --- Task Submission ---
 @app.route("/task/<task_id>/submit", methods=["POST"])
