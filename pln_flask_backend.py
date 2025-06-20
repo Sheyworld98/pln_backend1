@@ -124,7 +124,7 @@ def submit_answer(task_id):
     verify=False
 )
 
-print("CrowdLabel submission response:", res.status_code, res.text)  # 👈 Add this
+print("CrowdLabel submission response:", res.status_code, res.text)  
 
 if res.status_code != 200:
     print("CrowdLabel submission failed:", res.status_code, res.text)
