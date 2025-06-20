@@ -120,7 +120,7 @@ def submit_answer(task_id):
 
     print("Submission payload:", submission)
 
-    try:
+        try:
         headers = {
             "Content-Type": "application/json",
             "X-API-Key": "OkYLZD1-ZF0e9WV1wI5Naela5HhyVC6d"
@@ -129,14 +129,21 @@ def submit_answer(task_id):
             f"https://crowdlabel.tii.ae/api/2025.2/tasks/{task_id}/submit",
             headers=headers,
             json=submission,
-            verify=False
+            timeout=10  
+            # verify=True  
         )
-        print("CrowdLabel response:", res.status_code, res.text)
+        print("CrowdLabel response status:", res.status_code)
+        print("CrowdLabel response text:", res.text)
+
         if res.status_code != 200:
-            print("CrowdLabel submission failed:", res.status_code, res.text)
-            return jsonify({"error": "Failed to submit to CrowdLabel"}), 500
+            return jsonify({"error": "Failed to submit to CrowdLabel", "details": res.text}), 500
+    except requests.exceptions.SSLError as ssl_err:
+        print("SSL error:", ssl_err)
+        return jsonify({"error": "SSL verification failed", "details": str(ssl_err)}), 500
     except Exception as e:
-        return jsonify({"error": f"Submission exception: {str(e)}"}), 500
+        print("General submission error:", str(e))
+        return jsonify({"error": "Submission exception", "details": str(e)}), 500
+
 
     return jsonify({
         "message": "Answer submitted successfully!",
