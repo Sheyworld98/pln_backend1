@@ -1,10 +1,10 @@
-﻿from flask import Flask, request, jsonify 
+﻿from flask import Flask, request, jsonify
 from flask_cors import CORS
 import json
 import os
 from datetime import datetime
 import requests
-import certifi  # ✅ for SSL verification
+import certifi  # for correct SSL certificate verification
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
@@ -26,11 +26,13 @@ def users():
 
 @app.route("/profile/<user_id>")
 def profile(user_id):
+    user_id = user_id.strip()
     profiles = load_json("user_profile.json")
     return jsonify(profiles.get(user_id, {}))
 
 @app.route("/profile/update/<user_id>", methods=["POST"])
 def update_profile(user_id):
+    user_id = user_id.strip()
     profiles = load_json("user_profile.json")
     data = request.get_json()
     profiles.setdefault(user_id, {})
@@ -42,6 +44,7 @@ def update_profile(user_id):
 
 @app.route("/score/<user_id>")
 def score(user_id):
+    user_id = user_id.strip()
     history = load_json("user_history.json")
     return jsonify({user_id: len(history.get(user_id, [])) * 20})
 
@@ -54,11 +57,13 @@ def leaderboard():
 
 @app.route("/history/<user_id>")
 def history(user_id):
+    user_id = user_id.strip()
     history = load_json("user_history.json")
     return jsonify(history.get(user_id, []))
 
 @app.route("/task/fetch/<user_id>")
 def fetch_task(user_id):
+    user_id = user_id.strip()
     lang = request.args.get("lang", "en")
     topic = request.args.get("topic")
     complexity = request.args.get("complexity")
@@ -79,12 +84,14 @@ def fetch_task(user_id):
             "https://crowdlabel.tii.ae/api/2025.2/tasks/pick",
             params=params,
             headers=headers,
-            verify=certifi.where()  # ✅ SSL verification with certifi
+            verify=certifi.where()
         )
         if res.status_code != 200:
+            print("CrowdLabel task fetch failed:", res.text)
             return jsonify({"error": "Failed to fetch task"}), 500
         task_list = res.json()
     except Exception as e:
+        print("Fetch task exception:", e)
         return jsonify({"error": str(e)}), 500
 
     task = next((t for t in task_list if t['id'] not in user_done), None)
@@ -102,7 +109,7 @@ def submit_answer(task_id):
         data = request.get_json(force=True)
         print("Received data:", json.dumps(data, indent=2))
 
-        user_id = data["user_id"]
+        user_id = data["user_id"].strip()
         solution = data["solution"]
         question = data["question"]
         track_id = data["track_id"]
@@ -127,13 +134,12 @@ def submit_answer(task_id):
             "Content-Type": "application/json",
             "X-API-Key": "OkYLZD1-ZF0e9WV1wI5Naela5HhyVC6d"
         }
-
         res = requests.post(
             f"https://crowdlabel.tii.ae/api/2025.2/tasks/{task_id}/submit",
             headers=headers,
             json=submission,
             timeout=10,
-            verify=certifi.where()  # ✅ Trust anchor
+            verify=certifi.where()
         )
 
         print("CrowdLabel response status:", res.status_code)
@@ -144,6 +150,15 @@ def submit_answer(task_id):
                 "error": "Failed to submit to CrowdLabel",
                 "details": res.text
             }), 500
+
+        # Save submission locally
+        history = load_json("user_history.json")
+        history.setdefault(user_id, []).append(submission)
+        save_json("user_history.json", history)
+
+        completed = load_json("completed_tasks.json")
+        completed.setdefault(user_id, []).append(task_id)
+        save_json("completed_tasks.json", completed)
 
     except requests.exceptions.SSLError as ssl_err:
         print("SSL error:", ssl_err)
