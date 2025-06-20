@@ -130,7 +130,7 @@ def submit_answer(task_id):
             f"https://crowdlabel.tii.ae/api/2025.2/tasks/{task_id}/submit",
             headers=headers,
             json=submission,
-            timeout=10
+            timeout=10,
             verify=False  
         )
 
@@ -161,6 +161,7 @@ def submit_answer(task_id):
         "message": "Answer submitted successfully!",
         "confidence": 1.0
     }), 200
+
 
 
 if __name__ == "__main__":
