@@ -130,7 +130,7 @@ def fetch_task(user_id):
         return jsonify({"error": "Exception occurred while fetching task", "details": str(e)}), 500
 
 
-@app.route("/task/<task_id>/submit", methods=["POST", "OPTIONS"])
+@app.route("/task/submit/<task_id>", methods=["POST", "OPTIONS"])
 def submit_answer(task_id):
     if request.method == "OPTIONS":
         return jsonify({"message": "CORS preflight OK"}), 200
@@ -180,6 +180,16 @@ def submit_answer(task_id):
                 "error": "Failed to submit to CrowdLabel",
                 "details": res.text
             }), 500
+
+        # Save to local history
+        history = load_json("user_history.json")
+        history.setdefault(user_id, []).append(submission)
+        save_json("user_history.json", history)
+
+        # Save to completed
+        completed = load_json("completed_tasks.json")
+        completed.setdefault(user_id, []).append(task_id)
+        save_json("completed_tasks.json", completed)
 
     except Exception as e:
         print("General submission error:", str(e))
