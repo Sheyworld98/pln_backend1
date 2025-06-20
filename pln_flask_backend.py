@@ -40,6 +40,23 @@ def update_profile(user_id):
     save_json("user_profile.json", profiles)
     return jsonify({"message": "Profile updated."})
 
+@app.route("/score/<user_id>")
+def score(user_id):
+    history = load_json("user_history.json")
+    return jsonify({user_id: len(history.get(user_id, [])) * 20})
+
+@app.route("/leaderboard")
+def leaderboard():
+    history = load_json("user_history.json")
+    scores = [{"user_id": u, "score": len(h) * 20} for u, h in history.items()]
+    scores.sort(key=lambda x: x["score"], reverse=True)
+    return jsonify(scores)
+
+@app.route("/history/<user_id>")
+def history(user_id):
+    history = load_json("user_history.json")
+    return jsonify(history.get(user_id, []))
+
 @app.route("/task/fetch/<user_id>")
 def fetch_task(user_id):
     try:
