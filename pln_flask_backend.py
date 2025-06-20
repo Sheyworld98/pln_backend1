@@ -54,13 +54,12 @@ def leaderboard():
 
 @app.route("/task/fetch/<user_id>")
 def fetch_task(user_id):
-    import certifi  # ✅ Use certifi for secure SSL certificate verification
     lang = request.args.get("lang", "en")
-    topic = request.args.get("topic")
-    complexity = request.args.get("complexity")
+    topic = request.args.get("topic", None)
+    complexity = request.args.get("complexity", None)
 
     completed = load_json("completed_tasks.json")
-    user_done = set(completed.get(user_id.strip(), []))
+    user_done = set(completed.get(user_id, []))
 
     params = {"lang": lang}
     if topic:
@@ -68,19 +67,15 @@ def fetch_task(user_id):
     if complexity:
         params["complexity"] = complexity
 
-    headers = {
-        "x-api-key": "OkYLZD1-ZF0e9WV1wI5Naela5HhyVC6d"
-    }
+    headers = {"x-api-key": "OkYLZD1-ZF0e9WV1wI5Naela5HhyVC6d"}
 
     try:
         res = requests.get(
             "https://crowdlabel.tii.ae/api/2025.2/tasks/pick",
-            headers=headers,
             params=params,
-            verify=certifi.where(),  # ✅ Explicitly verify with certifi's cert bundle
-            timeout=10
+            headers=headers,
+            verify="/usr/local/lib/python3.11/site-packages/certifi/cacert.pem"  # or certifi.where()
         )
-
         print("CrowdLabel fetch status:", res.status_code)
         print("CrowdLabel response:", res.text)
 
@@ -88,20 +83,16 @@ def fetch_task(user_id):
             return jsonify({"error": "Failed to fetch task", "details": res.text}), 500
 
         task_list = res.json()
-
-    except requests.exceptions.SSLError as ssl_err:
-        print("SSL error during task fetch:", ssl_err)
-        return jsonify({"error": "SSL verification failed", "details": str(ssl_err)}), 500
     except Exception as e:
-        print("General fetch error:", str(e))
-        return jsonify({"error": "Task fetch failed", "details": str(e)}), 500
+        print("FETCH TASK ERROR:", str(e))  # 👈 print the full exception
+        return jsonify({"error": "Fetch task failed", "details": str(e)}), 500
 
-    # Pick first task not completed
     task = next((t for t in task_list if t['id'] not in user_done), None)
     if not task:
-        return jsonify({"error": "No new task available"}), 200
+        return jsonify({"error": "No new task available"})
 
     return jsonify(task)
+
 
 
 @app.route("/task/<task_id>/submit", methods=["POST", "OPTIONS"])
