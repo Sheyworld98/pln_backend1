@@ -6,7 +6,7 @@ from datetime import datetime
 import requests
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
 
 def load_json(path):
     if os.path.exists(path):
@@ -92,13 +92,17 @@ def fetch_task(user_id):
         if not task:
             return jsonify({"error": "No new task available"}), 404
 
-        return jsonify({"task": task})
+        return jsonifyreturn jsonify(task)
+
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-@app.route("/task/submit/<task_id>", methods=["POST"])
+@app.route("/task/submit/<task_id>", methods=["POST", "OPTIONS"])
 def submit_answer(task_id):
+    if request.method == "OPTIONS":
+        return jsonify({"message": "CORS preflight OK"}), 200
+
     data = request.get_json()
     user_id = data["user_id"]
     solution = data["solution"]
@@ -144,6 +148,7 @@ def submit_answer(task_id):
         "message": "Answer recorded",
         "confidence": 1.0
     })
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
