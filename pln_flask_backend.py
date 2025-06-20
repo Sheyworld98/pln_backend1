@@ -6,8 +6,9 @@ from datetime import datetime
 import requests
 
 app = Flask(__name__)
-CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
+CORS(app)
 
+# --- Utility Functions ---
 def load_json(path):
     if os.path.exists(path):
         with open(path, "r") as f:
@@ -18,20 +19,19 @@ def save_json(path, data):
     with open(path, "w") as f:
         json.dump(data, f, indent=2)
 
+# --- User Endpoints ---
 @app.route("/users")
 def users():
-    users_data = load_json("user_profile.json")
-    return jsonify(list(users_data.keys()))
+    return jsonify(list(load_json("user_profile.json").keys()))
 
 @app.route("/profile/<user_id>")
 def profile(user_id):
-    profiles = load_json("user_profile.json")
-    return jsonify(profiles.get(user_id, {}))
+    return jsonify(load_json("user_profile.json").get(user_id, {}))
 
 @app.route("/profile/update/<user_id>", methods=["POST"])
 def update_profile(user_id):
     profiles = load_json("user_profile.json")
-    data = request.get_json()
+    data = request.get_json(force=True)
     profiles.setdefault(user_id, {})
     profiles[user_id]["languages"] = [data.get("lang", "en")]
     profiles[user_id]["expertise_domains"] = [data.get("expertise", "general")]
@@ -41,8 +41,7 @@ def update_profile(user_id):
 
 @app.route("/score/<user_id>")
 def score(user_id):
-    history = load_json("user_history.json")
-    return jsonify({user_id: len(history.get(user_id, [])) * 20})
+    return jsonify({user_id: len(load_json("user_history.json").get(user_id, [])) * 20})
 
 @app.route("/leaderboard")
 def leaderboard():
@@ -53,17 +52,15 @@ def leaderboard():
 
 @app.route("/history/<user_id>")
 def history(user_id):
-    history = load_json("user_history.json")
-    return jsonify(history.get(user_id, []))
+    return jsonify(load_json("user_history.json").get(user_id, []))
 
+# --- Task Fetching ---
 @app.route("/task/fetch/<user_id>")
 def fetch_task(user_id):
     lang = request.args.get("lang", "en")
-    topic = request.args.get("topic", None)
-    complexity = request.args.get("complexity", None)
-
-    completed = load_json("completed_tasks.json")
-    user_done = set(completed.get(user_id, []))
+    topic = request.args.get("topic")
+    complexity = request.args.get("complexity")
+    completed = set(load_json("completed_tasks.json").get(user_id, []))
 
     params = {"lang": lang}
     if topic:
@@ -79,31 +76,28 @@ def fetch_task(user_id):
             params=params,
             headers=headers,
             timeout=10,
-            verify=False  # SSL bypassed for dev
+            verify=False
         )
         if res.status_code != 200:
             return jsonify({"error": "Failed to fetch task"}), 500
 
         task_list = res.json()
-        if not isinstance(task_list, list) or not task_list:
-            return jsonify({"error": "No tasks available or API issue"}), 500
-
-        task = next((t for t in task_list if t['id'] not in user_done), None)
+        task = next((t for t in task_list if t['id'] not in completed), None)
         if not task:
             return jsonify({"error": "No new task available"}), 404
 
-        return jsonify(task)
-
+        return jsonify({"task": task})
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+# --- Task Submission ---
 @app.route("/task/<task_id>/submit", methods=["POST"])
 def submit_answer(task_id):
     try:
         data = request.get_json(force=True)
         if not data:
-            return jsonify({"error": "Invalid input", "details": "Empty JSON body"}), 400
+            return jsonify({"error": "Empty request body"}), 400
     except Exception as e:
         return jsonify({"error": "Invalid input", "details": str(e)}), 400
 
@@ -132,7 +126,7 @@ def submit_answer(task_id):
     try:
         res = requests.post(
             f"https://crowdlabel.tii.ae/api/2025.2/tasks/{task_id}/submit",
-            data={  # NOT json=
+            data={
                 "track_id": track_id,
                 "solution": solution
             },
@@ -140,32 +134,21 @@ def submit_answer(task_id):
             timeout=10,
             verify=False
         )
-
         if res.status_code != 200:
-            return jsonify({
-                "error": "Failed to submit to CrowdLabel",
-                "details": res.text
-            }), 500
+            return jsonify({"error": "Failed to submit to CrowdLabel", "details": res.text}), 500
+
     except Exception as e:
         return jsonify({"error": "Submission error", "details": str(e)}), 500
 
-    # Save to history
     history = load_json("user_history.json")
     history.setdefault(user_id, []).append(submission)
     save_json("user_history.json", history)
 
-    # Save to completed
     completed = load_json("completed_tasks.json")
     completed.setdefault(user_id, []).append(task_id)
     save_json("completed_tasks.json", completed)
 
-    return jsonify({
-        "message": "Answer recorded",
-        "confidence": 1.0
-    })
-
-
-
+    return jsonify({"message": "Answer recorded", "confidence": 1.0})
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
