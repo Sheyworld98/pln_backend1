@@ -81,11 +81,12 @@ def history(user_id):
 
 @app.route("/task/fetch/<user_id>")
 def fetch_task(user_id):
+    import traceback
+
     lang = request.args.get("lang", "en")
     topic = request.args.get("topic")
     complexity = request.args.get("complexity")
 
-    # Validate inputs
     if lang not in SUPPORTED_LANGUAGES:
         return jsonify({"error": f"Unsupported language: {lang}"}), 400
     if topic and topic not in SUPPORTED_TOPICS:
@@ -93,10 +94,13 @@ def fetch_task(user_id):
     if complexity and complexity not in SUPPORTED_COMPLEXITY:
         return jsonify({"error": f"Unsupported complexity: {complexity}"}), 400
 
-    completed = load_json("completed_tasks.json")
-    user_done = set(completed.get(user_id, []))
+    try:
+        completed = load_json("completed_tasks.json")
+        user_done = set(completed.get(user_id, []))
+    except Exception as e:
+        print("⚠️ Error loading completed_tasks.json:", str(e))
+        user_done = set()
 
-    # Build query params
     params = {"lang": lang}
     if topic:
         params["topic"] = topic
@@ -108,38 +112,48 @@ def fetch_task(user_id):
     }
 
     try:
-        # Make request to CrowdLabel
         res = requests.get(
             "https://crowdlabel.tii.ae/api/2025.2/tasks/pick",
             params=params,
             headers=headers,
             verify=certifi.where()
         )
-        print("CrowdLabel fetch response:", res.status_code, res.text)
+        print("📡 CrowdLabel response:", res.status_code, res.text)
 
-        # Parse and normalize response
+        if res.status_code != 200:
+            return jsonify({
+                "error": "Failed to fetch task from CrowdLabel",
+                "details": res.text
+            }), 500
+
         try:
             data = res.json()
-        except Exception as parse_err:
-            return jsonify({"error": "Failed to parse CrowdLabel response", "details": str(parse_err)}), 500
+        except Exception as json_err:
+            print("❌ JSON decode error:", str(json_err))
+            return jsonify({"error": "Invalid JSON from API"}), 500
 
+        # Normalize the response: some APIs return dict, some return list
         if isinstance(data, dict):
-            data = [data]  # wrap single object in list
+            data = [data]
 
         if not isinstance(data, list) or not data:
-            return jsonify({"error": "No tasks available"}), 404
+            return jsonify({"error": "No tasks returned from API."}), 404
 
-        # Pick first new task not done by user
-        task = next((t for t in data if t['id'] not in user_done), None)
+        # Filter out already completed tasks
+        task = next((t for t in data if t.get("id") not in user_done), None)
         if not task:
-            return jsonify({"error": "No new task available for this user."}), 404
+            return jsonify({"error": "No new tasks available for user"}), 404
 
         return jsonify(task), 200
 
-    except requests.exceptions.SSLError as ssl_err:
-        return jsonify({"error": "SSL verification failed", "details": str(ssl_err)}), 500
     except Exception as e:
-        return jsonify({"error": "Error fetching task", "details": str(e)}), 500
+        print("💥 Unhandled fetch exception:", str(e))
+        print(traceback.format_exc())
+        return jsonify({
+            "error": "Exception occurred while fetching task",
+            "details": str(e)
+        }), 500
+
 
 
 @app.route("/task/<task_id>/submit", methods=["POST", "OPTIONS"])
